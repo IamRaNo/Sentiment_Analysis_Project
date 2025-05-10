@@ -28,7 +28,14 @@ def pre_processing(text):
     return " ".join(processed_text)
 
 
-nlp = spacy.load('en_core_web_md')
+import spacy
+
+try:
+    nlp = spacy.load("en_core_web_md")
+except OSError:
+    import en_core_web_md
+    nlp = en_core_web_md.load()
+
 slang_dict = dill.load(open('slang_dict.dill', 'rb'))
 punctuations = dill.load(open('punctuations.dill', 'rb'))
 stop_words = dill.load(open('stop_words.dill', 'rb'))

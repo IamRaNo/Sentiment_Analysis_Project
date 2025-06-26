@@ -1,60 +1,77 @@
-import contractions
 import re
 import dill
 import pickle
+import contractions
 import spacy
 import sklearn
-
 import streamlit as st
 
-st.title('Sentiment Analysis')
+# Page configuration
+st.set_page_config(page_title="Sentiment Analysis", layout="centered")
+st.title('🧠 Sentiment Analysis App')
 
-
-def pre_processing(text):
-    text = text.lower()
-    url_regex = re.compile(r"https?://\S+|www\.\S+")
-    text = url_regex.sub('', text)
-    text = text.replace('`', "'").strip()
-    text = text.strip()
-    text = contractions.fix(text).lower()
-    for item in text.split():
-        if item in slang_dict.keys():
-            text = text.replace(item, slang_dict.get(item))
-    doc = nlp(text)
-    processed_text = []
-    for tokens in doc:
-        if tokens.text not in stop_words and tokens.text not in punctuations:
-            processed_text.append(tokens.lemma_.lower())
-    return " ".join(processed_text)
-
-
-import spacy
-
+# Load spaCy model
 try:
     nlp = spacy.load("en_core_web_md")
 except OSError:
     import en_core_web_md
     nlp = en_core_web_md.load()
 
+# Load necessary files
+with open('slang_dict.dill', 'rb') as f:
+    slang_dict = dill.load(f)
 
-slang_dict = dill.load(open('slang_dict.dill', 'rb'))
-punctuations = dill.load(open('punctuations.dill', 'rb'))
-stop_words = dill.load(open('stop_words.dill', 'rb'))
-predict_new = dill.load(open('predict_new.dill', 'rb'))
-vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
-classifier = pickle.load(open('classifier.pkl', 'rb'))
-encoder = pickle.load(open('encoder.pkl', 'rb'))
+with open('punctuations.dill', 'rb') as f:
+    punctuations = dill.load(f)
+
+with open('stop_words.dill', 'rb') as f:
+    stop_words = dill.load(f)
+
+with open('predict_new.dill', 'rb') as f:
+    predict_new = dill.load(f)
+
+with open('vectorizer.pkl', 'rb') as f:
+    vectorizer = pickle.load(f)
+
+with open('classifier.pkl', 'rb') as f:
+    classifier = pickle.load(f)
+
+with open('encoder.pkl', 'rb') as f:
+    encoder = pickle.load(f)
 
 
-def predictNew(new_text):
-    processed_text = pre_processing(new_text)
-    processed_text = vectorizer.transform([processed_text]).toarray()
-    pred = classifier.predict(processed_text)
-    return encoder.classes_[pred][0]
+# Preprocessing Function
+def pre_processing(text):
+    text = text.lower()
+    text = re.sub(r"https?://\S+|www\.\S+", "", text)
+    text = contractions.fix(text).strip()
+    words = text.split()
+    words = [slang_dict.get(word, word) for word in words]
+    text = " ".join(words)
+
+    doc = nlp(text)
+    processed = [
+        token.lemma_.lower()
+        for token in doc
+        if token.text not in stop_words and token.text not in punctuations
+    ]
+    return " ".join(processed)
 
 
-element = st.text_area("Enter your text")
+# Prediction Function
+def predict_sentiment(text):
+    cleaned_text = pre_processing(text)
+    vector = vectorizer.transform([cleaned_text]).toarray()
+    prediction = classifier.predict(vector)
+    return encoder.classes_[prediction][0]
 
-if st.button('Predict'):
-    prediction = (predictNew(pre_processing(element)))
-    st.write(prediction)
+
+# Streamlit UI
+user_input = st.text_area("📝 Enter your text below:", height=200)
+
+if st.button('🔍 Predict Sentiment'):
+    if user_input.strip() == "":
+        st.warning("Please enter some text before predicting.")
+    else:
+        result = predict_sentiment(user_input)
+        st.success(f"💬 Sentiment: **{result}**")
